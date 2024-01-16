@@ -99,10 +99,3 @@ def search(query, path=None, max_results=5):
     chroma_client.delete_collection("temp")
 
     return results["documents"][0]
-
-# Should use system search, like spotlight, to narrow it down. Then rerank with semantic.
-# Should use sub indexes in nested dirs if they exist.
-# Better chunking that works per sentence, paragraph, word level rather than by character.
-
-results = search("dataset for a downstream application like a note-taking app will require a massive pre-existing", path="/content/test")
-results[0]
