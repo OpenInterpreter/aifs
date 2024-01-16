@@ -7,13 +7,15 @@ Simple, fast, local semantic search. Uses an _.aifs file to store embeddings in 
 # Should use sub indexes in nested dirs if they exist.
 # Better chunking that works per sentence, paragraph, word level rather than by character.
 
+import ast
 import os
 import chromadb
 from unstructured.chunking.title import chunk_by_title
 from unstructured.partition.auto import partition
-import numpy as np
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
 import json
+
+# Note: Set AIFS_MINIMAL_PYTHON_INDEXING to True in your env vars to use a much simpler, faster Python index method.
 
 MAX_CHARS_PER_CHUNK = 500
 MAX_CHUNKS = 300 # More than this, and we'll just embed the filename. None to embed any # of chunks.
@@ -35,6 +37,10 @@ def chunk_file(path):
     return [c.text for c in chunks]
 
 def index_file(path):
+    use_minimal_python_method = os.getenv('AIFS_MINIMAL_PYTHON_INDEXING')
+    if use_minimal_python_method and use_minimal_python_method.lower() == 'true':
+        return minimally_index_python_file(path)
+
     print(f"Indexing {path}...")
     try:
       chunks = chunk_file(path)
@@ -56,17 +62,55 @@ def index_file(path):
         "last_modified": last_modified,
     }
 
+def minimally_index_python_file(path):
+    """
+    This function indexes a Python file in a minimal way.
+    It only embeds the docstrings for semantic search, which then point to only the function name.
+    """
+    chunks = []
+    representations = []
+    
+    with open(path, "r") as source:
+        tree = ast.parse(source.read())
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            chunks.append(node.name)
+            docstring = ast.get_docstring(node)
+            representations.append(docstring if docstring else node.name)
+
+    embeddings = embed(representations)
+    last_modified = os.path.getmtime(path)
+
+    return {
+        "chunks": chunks,
+        "embeddings": embeddings,
+        "last_modified": last_modified,
+    }
+
 def index_directory(path):
     index = {}
     for root, _, files in os.walk(path):
         for file in files:
-            if file != "" and file != "_index.aifs":
+            if file != "" and file != "_index.aifs" and file != ".DS_Store":
                 file_path = os.path.join(root, file)
                 file_index = index_file(file_path)
                 index[file_path] = file_index
     return index
 
 def search(query, path=None, max_results=5):
+    """
+    Performs a semantic search of the `query` in `path` and its subdirectories.
+
+    Parameters:
+    query (str): The search query.
+    path (str, optional): The path to the directory to search. Defaults to the current working directory.
+    max_results (int, optional): The maximum number of search results to return. Defaults to 5.
+
+    Returns:
+    list: A list of search results.
+    """
+
     if path == None:
         path = os.getcwd()
 

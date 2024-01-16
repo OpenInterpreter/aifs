@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aifs"
-version = "0.0.2"
+version = "0.0.3"
 description = "Local semantic search. Stupidly simple."
 authors = ["Killian Lucas <killian@openinterpreter.com>"]
 license = "MIT"
@@ -11,6 +11,9 @@ python = ">=3.9.0,<3.12"
 unstructured = {extras = ["all-docs"], version = "^0.12.0"}
 chromadb = "^0.4.22"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
 
 [build-system]
 requires = ["poetry-core"]
