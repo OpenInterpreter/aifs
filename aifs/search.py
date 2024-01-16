@@ -1,3 +1,12 @@
+"""
+Simple, fast, local semantic search. Uses an _.aifs file to store embeddings in top most directory.
+"""
+
+# TODO
+# Should use system search, like spotlight, to narrow it down. Then rerank with semantic.
+# Should use sub indexes in nested dirs if they exist.
+# Better chunking that works per sentence, paragraph, word level rather than by character.
+
 import os
 import chromadb
 from unstructured.chunking.title import chunk_by_title
