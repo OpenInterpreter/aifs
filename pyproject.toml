@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "y"
+name = "aifs"
 version = "0.0.1"
 description = "Local semantic search. Stupidly simple."
-authors = ["Your Name <you@example.com>"]
+authors = ["Killian Lucas <killian@openinterpreter.com>"]
 license = "MIT"
 readme = "README.md"
 
