@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9.0,<3.12"
+python = ">=3.9,<4.0"
 unstructured = {extras = ["all-docs"], version = "^0.12.0"}
 chromadb = "^0.4.22"
 
