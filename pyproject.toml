@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aifs"
-version = "0.0.4"
+version = "0.0.5"
 description = "Local semantic search. Stupidly simple."
 authors = ["Killian Lucas <killian@openinterpreter.com>"]
 license = "MIT"
