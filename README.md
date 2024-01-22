@@ -1,6 +1,6 @@
 # AI Filesystem
 
-Local semantic search. Why didn't this exist?
+Local semantic search over folders. Why didn't this exist?
 
 ```shell
 pip install aifs
