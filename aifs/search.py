@@ -18,18 +18,14 @@ import json
 # Note: Set AIFS_MINIMAL_PYTHON_INDEXING to True in your env vars to use a much simpler, faster Python index method.
 
 MAX_CHARS_PER_CHUNK = 500
-MAX_CHUNKS = 300 # More than this, and we'll just embed the filename. None to embed any # of chunks.
+MAX_CHUNKS = None # More than this, and we'll just embed the filename. None to embed any # of chunks.
 
 # Set up the embedding function
 os.environ[
     "TOKENIZERS_PARALLELISM"
 ] = "false"  # Otherwise setup_embed displays a warning message
-try:
-    embed = setup_embed()
-except:
-    # This does set up a model that we don't strictly need.
-    # If it fails, it's not worth breaking everything.
-    pass
+
+embed = setup_embed()
 
 def chunk_file(path):
     elements = partition(filename=path)
