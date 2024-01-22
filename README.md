@@ -19,7 +19,7 @@ search("It's not unlike how Spotlight works.") # Path defaults to CWD
 
 ![aifs](https://github.com/KillianLucas/aifs/assets/63927363/c61599a9-aad8-483d-b6a4-3671629cd5f4)
 
-Running `aifs.search` will chunk and embed all nested supported files (.txt, .docx, .pptx, .jpg, .png, .eml, .html, and .pdf) in `path`. It will then store these embeddings into an `_.aifs` file in `path`.
+Running `aifs.search` will chunk and embed all nested supported files (`.txt`, `.docx`, `.pptx`, `.jpg`, `.png`, `.eml`, `.html`, and `.pdf`) in `path`. It will then store these embeddings into an `_.aifs` file in `path`.
 
 By storing the index, you only have to chunk/embed once. This makes semantic search **very** fast after the first time you search a path.
 
