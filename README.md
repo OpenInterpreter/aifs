@@ -33,6 +33,15 @@ If a file has changed or been added, `aifs.search` will update or add those chun
 
 If an `_.aifs` file _is_ found in a directory, it uses that instead of indexing it again. If some files have been updated, it will re-index those.
 
+# Goals
+
+- We should always have SOTA parsing and chunking. The logic for this should be swapped out as new methods arise.
+  - Chunking should be semantic — as in, `python` and `markdown` files should have _different_ chunking algorithms based on the expected content of those filetypes. Who has this solution?
+  - For parsing, I think Unstructured is the best of the best. Is this true?
+- We should always have SOTA embedding. If a better local embedding model is found, we should automatically download and use it.
+  - I think Chroma will always do this (is this true?) so we depend on Chroma.
+- This project should stay **minimally scoped** — we want `aifs` to be the best local semantic search in the universe.
+
 # Why?
 
 We built this to let [`open-interpreter`](https://openinterpreter.com/) quickly semantically search files/folders.
