@@ -1,5 +1,7 @@
 # AI Filesystem
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1QdXPchTDnzW6I_3HTZFpSeak_XoH81v5?usp=sharing)
+
 Local semantic search over folders. Why didn't this exist?
 
 ```shell
