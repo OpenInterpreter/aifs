@@ -27,6 +27,39 @@ os.environ[
 
 embed = setup_embed()
 
+# Function to extract function arguments and annotations
+def format_function_details(func_def):
+    name = func_def.name
+    args = [(arg.arg, None if not arg.annotation else ast.unparse(arg.annotation)) for arg in func_def.args.args]
+    vararg = (func_def.args.vararg.arg, ast.unparse(func_def.args.vararg.annotation)) if func_def.args.vararg else None
+    return_annotation = ast.unparse(func_def.returns) if func_def.returns else None
+    docstring = ast.get_docstring(func_def)
+
+    # Start with the function name and opening parenthesis
+    formatted_string = f"(function) def {name}(\n"
+    
+    # Add each positional argument with its annotation
+    for arg_name, arg_annotation in args:
+        formatted_string += f"    {arg_name}: {arg_annotation},\n"
+    
+    # Add varargs if present
+    if vararg:
+        formatted_string += f"    *{vararg[0]}: {vararg[1]}\n"
+    
+    # Close the parenthesis and add return annotation
+    formatted_string += f") -> {return_annotation}\n\n"
+    
+    # Add the docstring if present
+    if docstring:
+        formatted_string += f"{docstring}\n"
+    print(formatted_string)
+    
+    return formatted_string
+
+def log(str):
+    verbose = os.environ['LOG_VERBOSE']
+    if verbose and verbose == 'True': print(str)
+
 def chunk_file(path):
     elements = partition(filename=path)
     chunks = chunk_by_title(elements, max_characters=MAX_CHARS_PER_CHUNK)
@@ -37,7 +70,7 @@ def index_file(path):
     if use_minimal_python_method and use_minimal_python_method.lower() == 'true':
         return minimally_index_python_file(path)
 
-    print(f"Indexing {path}...")
+    log(f"Indexing {path}...")
     try:
       chunks = chunk_file(path)
       if chunks == []:
@@ -45,8 +78,8 @@ def index_file(path):
       if MAX_CHUNKS and len(chunks) > MAX_CHUNKS:
         raise Exception("Too many chunks. Will just embed filename.")
     except Exception as e:
-      print(f"Couldn't read `{path}`. Continuing.")
-      print(e)
+      log(f"Couldn't read `{path}`. Continuing.")
+      log(e)
       chunks = [f"There is a file at `{path}`."]
 
     embeddings = embed(chunks)
@@ -71,8 +104,9 @@ def minimally_index_python_file(path):
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
-            chunks.append(node.name)
             docstring = ast.get_docstring(node)
+            formatted_string = format_function_details(node)
+            chunks.append(formatted_string)
             representations.append(docstring if docstring else node.name)
 
     embeddings = embed(representations)
@@ -92,7 +126,7 @@ def index_directory(path, existingIndex={}, indexPath=""):
     for file_path, file_index in index.items():
         # if a file is deleted since last index, add it to deletedFiles
         if not os.path.isfile(file_path):
-            print(f"Removing {file_path} since it does not exist.")
+            log(f"Removing {file_path} since it does not exist.")
             deletedFiles.append(file_path)
             writeToIndex = True
             continue
@@ -100,7 +134,7 @@ def index_directory(path, existingIndex={}, indexPath=""):
         # if a file is modified since last index, re-index it
         if os.path.getmtime(file_path) != file_index["last_modified"]:
             modifiedFiles.append(file_path)
-            print(f"Re-indexing {file_path} due to modification.")
+            log(f"Re-indexing {file_path} due to modification.")
             new_file_index = index_file(file_path)
             index[file_path] = new_file_index
             writeToIndex = True
@@ -115,22 +149,22 @@ def index_directory(path, existingIndex={}, indexPath=""):
                 file_path = os.path.join(root, file)
                 # if there are new files not in index, or modified Files, index them
                 if file_path not in index or file_path in modifiedFiles:
-                    print(f"{file_path} is new file or modified, indexing it")
+                    log(f"{file_path} is new file or modified, indexing it")
                     writeToIndex = True
                     file_index = index_file(file_path)
                     index[file_path] = file_index
                 else:
-                   print(f"{file_path} is in index, skip")
+                   log(f"{file_path} is in index, skip")
     
     # if there are any modifications to index, write it agian
     if writeToIndex:
-        print(f"Index has changed, saving again to {indexPath}")
+        log(f"Index has changed, saving again to {indexPath}")
         with open(indexPath, 'w') as f:
             json.dump(index, f)
     
     return index
 
-def search(query, path=None, max_results=5):
+def search(query, path=None, max_results=5, verbose=False):
     """
     Performs a semantic search of the `query` in `path` and its subdirectories.
 
@@ -142,7 +176,7 @@ def search(query, path=None, max_results=5):
     Returns:
     list: A list of search results.
     """
-
+    os.environ['LOG_VERBOSE'] = str(verbose)
     if path == None:
         path = os.getcwd()
 
@@ -150,9 +184,9 @@ def search(query, path=None, max_results=5):
     index = {}
     if not os.path.exists(path_to_index):
         # No index. We're embedding everything.
-        print(f"Indexing `{path}` for AI search. This will take time, but only happens once.")
+        log(f"Indexing `{path}` for AI search. This will take time, but only happens once.")
     else:
-        print(f"Using existing index at `{path}`")
+        log(f"Using existing index at `{path}`")
         with open(path_to_index, 'r') as f:
             index = json.load(f)
     
@@ -175,7 +209,7 @@ def search(query, path=None, max_results=5):
         query_texts=[query],
         n_results=max_results
     )
-    print(results)
+    log(results)
 
     chroma_client.delete_collection("temp")
 
