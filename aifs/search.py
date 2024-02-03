@@ -84,14 +84,50 @@ def minimally_index_python_file(path):
         "last_modified": last_modified,
     }
 
-def index_directory(path):
-    index = {}
+def index_directory(path, existingIndex={}, indexPath=""):
+    index = existingIndex
+    deletedFiles = []
+    modifiedFiles = []
+    writeToIndex = False
+    for file_path, file_index in index.items():
+        # if a file is deleted since last index, add it to deletedFiles
+        if not os.path.isfile(file_path):
+            print(f"Removing {file_path} since it does not exist.")
+            deletedFiles.append(file_path)
+            writeToIndex = True
+            continue
+
+        # if a file is modified since last index, re-index it
+        if os.path.getmtime(file_path) != file_index["last_modified"]:
+            modifiedFiles.append(file_path)
+            print(f"Re-indexing {file_path} due to modification.")
+            new_file_index = index_file(file_path)
+            index[file_path] = new_file_index
+            writeToIndex = True
+    
+    # remove deleted files
+    for file_path in deletedFiles:
+        index.pop(file_path, None)
+    
     for root, _, files in os.walk(path):
         for file in files:
-            if file != "" and file != "_index.aifs" and file != ".DS_Store":
+            if file != "" and file != "_index.aifs" and file != ".DS_Store" and file != "_.aifs":
                 file_path = os.path.join(root, file)
-                file_index = index_file(file_path)
-                index[file_path] = file_index
+                # if there are new files not in index, or modified Files, index them
+                if file_path not in index or file_path in modifiedFiles:
+                    print(f"{file_path} is new file or modified, indexing it")
+                    writeToIndex = True
+                    file_index = index_file(file_path)
+                    index[file_path] = file_index
+                else:
+                   print(f"{file_path} is in index, skip")
+    
+    # if there are any modifications to index, write it agian
+    if writeToIndex:
+        print(f"Index has changed, saving again to {indexPath}")
+        with open(indexPath, 'w') as f:
+            json.dump(index, f)
+    
     return index
 
 def search(query, path=None, max_results=5):
@@ -111,22 +147,17 @@ def search(query, path=None, max_results=5):
         path = os.getcwd()
 
     path_to_index = os.path.join(path, "_.aifs")
+    index = {}
     if not os.path.exists(path_to_index):
         # No index. We're embedding everything.
         print(f"Indexing `{path}` for AI search. This will take time, but only happens once.")
-        index = index_directory(path)
-        with open(path_to_index, 'w') as f:
-            json.dump(index, f)
     else:
+        print(f"Using existing index at `{path}`")
         with open(path_to_index, 'r') as f:
             index = json.load(f)
-        
-        for file_path, file_index in index.items():
-            if os.path.getmtime(file_path) != file_index["last_modified"]:
-                print(f"Re-indexing {file_path} due to modification.")
-                new_file_index = index_file(file_path)
-                index[file_path] = new_file_index
-        
+    
+    index = index_directory(path, existingIndex=index, indexPath=path_to_index)
+
     chroma_client = chromadb.Client()
     collection = chroma_client.get_or_create_collection(name="temp")
     id_counter = 0
@@ -144,6 +175,7 @@ def search(query, path=None, max_results=5):
         query_texts=[query],
         n_results=max_results
     )
+    print(results)
 
     chroma_client.delete_collection("temp")
 
