@@ -15,8 +15,6 @@ from unstructured.partition.auto import partition
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
 import json
 
-# Note: Set AIFS_MINIMAL_PYTHON_INDEXING to True in your env vars to use a much simpler, faster Python index method.
-
 MAX_CHARS_PER_CHUNK = 500
 MAX_CHUNKS = None # More than this, and we'll just embed the filename. None to embed any # of chunks.
 
@@ -65,9 +63,8 @@ def chunk_file(path):
     chunks = chunk_by_title(elements, max_characters=MAX_CHARS_PER_CHUNK)
     return [c.text for c in chunks]
 
-def index_file(path):
-    use_minimal_python_method = os.getenv('AIFS_MINIMAL_PYTHON_INDEXING')
-    if use_minimal_python_method and use_minimal_python_method.lower() == 'true':
+def index_file(path, python_docstrings_only=False):
+    if python_docstrings_only and path.lower.endswith(".py"):
         return minimally_index_python_file(path)
 
     log(f"Indexing {path}...")
@@ -118,7 +115,7 @@ def minimally_index_python_file(path):
         "last_modified": last_modified,
     }
 
-def index_directory(path, existingIndex={}, indexPath=""):
+def index_directory(path, existingIndex={}, indexPath="", python_docstrings_only=False):
     index = existingIndex
     deletedFiles = []
     modifiedFiles = []
@@ -135,7 +132,7 @@ def index_directory(path, existingIndex={}, indexPath=""):
         if os.path.getmtime(file_path) != file_index["last_modified"]:
             modifiedFiles.append(file_path)
             log(f"Re-indexing {file_path} due to modification.")
-            new_file_index = index_file(file_path)
+            new_file_index = index_file(file_path, python_docstrings_only)
             index[file_path] = new_file_index
             writeToIndex = True
     
@@ -151,7 +148,7 @@ def index_directory(path, existingIndex={}, indexPath=""):
                 if file_path not in index or file_path in modifiedFiles:
                     log(f"{file_path} is new file or modified, indexing it")
                     writeToIndex = True
-                    file_index = index_file(file_path)
+                    file_index = index_file(file_path, python_docstrings_only)
                     index[file_path] = file_index
                 else:
                    log(f"{file_path} is in index, skip")
@@ -164,7 +161,7 @@ def index_directory(path, existingIndex={}, indexPath=""):
     
     return index
 
-def search(query, path=None, max_results=5, verbose=False):
+def search(query, path=None, max_results=5, verbose=False, python_docstrings_only=False):
     """
     Performs a semantic search of the `query` in `path` and its subdirectories.
 
@@ -190,7 +187,7 @@ def search(query, path=None, max_results=5, verbose=False):
         with open(path_to_index, 'r') as f:
             index = json.load(f)
     
-    index = index_directory(path, existingIndex=index, indexPath=path_to_index)
+    index = index_directory(path, existingIndex=index, indexPath=path_to_index, python_docstrings_only=python_docstrings_only)
 
     chroma_client = chromadb.Client()
     collection = chroma_client.get_or_create_collection(name="temp")
