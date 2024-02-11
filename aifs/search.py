@@ -107,6 +107,9 @@ def minimally_index_python_file(path):
     def traverse(node):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, ast.FunctionDef):
+                if child.name.startswith("_"):
+                    # ignore private functions
+                    continue
                 class_name = node.name if isinstance(node, ast.ClassDef) else None
                 docstring = ast.get_docstring(child)
                 formatted_string = format_function_details(child, class_name)
@@ -226,6 +229,8 @@ def search(query, path=None, file_paths=None, max_results=5, verbose=False, pyth
 
     if path is None:
         common_prefix = os.path.commonprefix(file_paths)
+        if not common_prefix.endswith("/"):
+            common_prefix = os.path.dirname(common_prefix)
         path_to_index = os.path.join(common_prefix, "_.aifs")
     else:
         path_to_index = os.path.join(path, "_.aifs")
@@ -250,7 +255,6 @@ def search(query, path=None, file_paths=None, max_results=5, verbose=False, pyth
     collection = chroma_client.get_or_create_collection(name="temp")
     id_counter = 0
     for file_path, file_index in index.items():
-        print(f"Indexing {file_path}...")
         if "__pycache__" in file_path:
             continue
         ids = [str(id) for id in range(id_counter, id_counter + len(file_index["chunks"]))]
