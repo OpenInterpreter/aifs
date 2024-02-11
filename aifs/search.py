@@ -9,6 +9,7 @@ Simple, fast, local semantic search. Uses an _.aifs file to store embeddings in 
 
 import ast
 import os
+from typing import List
 import chromadb
 from unstructured.chunking.title import chunk_by_title
 from unstructured.partition.auto import partition
@@ -26,7 +27,7 @@ os.environ[
 embed = setup_embed()
 
 # Function to extract function arguments and annotations
-def format_function_details(func_def):
+def format_function_details(func_def, class_name=None):
     name = func_def.name
     args = [(arg.arg, None if not arg.annotation else ast.unparse(arg.annotation)) for arg in func_def.args.args]
     vararg = (func_def.args.vararg.arg, ast.unparse(func_def.args.vararg.annotation)) if func_def.args.vararg and func_def.args.vararg.annotation else None
@@ -34,22 +35,25 @@ def format_function_details(func_def):
     docstring = ast.get_docstring(func_def)
 
     # Start with the function name and opening parenthesis
-    formatted_string = f"(function) def {name}(\n"
+    if class_name:
+        formatted_string = f"{class_name}.{name}("
+    else:
+        formatted_string = f"{name}("
     
     # Add each positional argument with its annotation
     for arg_name, arg_annotation in args:
-        formatted_string += f"    {arg_name}: {arg_annotation},\n"
+        formatted_string += f"    {arg_name}: {arg_annotation}, "
     
     # Add varargs if present
     if vararg:
-        formatted_string += f"    *{vararg[0]}: {vararg[1]}\n"
+        formatted_string += f"    *{vararg[0]}: {vararg[1]}"
     
     # Close the parenthesis and add return annotation
-    formatted_string += f") -> {return_annotation}\n\n"
+    formatted_string += f") -> {return_annotation}"
     
     # Add the docstring if present
     if docstring:
-        formatted_string += f"{docstring}\n"
+        formatted_string += f"  # {docstring}"
     print(formatted_string)
     
     return formatted_string
@@ -88,6 +92,7 @@ def index_file(path, python_docstrings_only=False):
         "last_modified": last_modified,
     }
 
+
 def minimally_index_python_file(path):
     """
     This function indexes a Python file in a minimal way.
@@ -99,12 +104,17 @@ def minimally_index_python_file(path):
     with open(path, "r") as source:
         tree = ast.parse(source.read())
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            docstring = ast.get_docstring(node)
-            formatted_string = format_function_details(node)
-            chunks.append(formatted_string)
-            representations.append(docstring if docstring else node.name)
+    def traverse(node):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.FunctionDef):
+                class_name = node.name if isinstance(node, ast.ClassDef) else None
+                docstring = ast.get_docstring(child)
+                formatted_string = format_function_details(child, class_name)
+                chunks.append(formatted_string)
+                representations.append(docstring if docstring else child.name)
+            traverse(child)
+
+    traverse(tree)
 
     embeddings = embed(representations) if representations else []
     last_modified = os.path.getmtime(path)
@@ -115,30 +125,71 @@ def minimally_index_python_file(path):
         "last_modified": last_modified,
     }
 
-def index_directory(path, existingIndex={}, indexPath="", python_docstrings_only=False):
+
+def index_files(file_paths, existingIndex=None, indexPath="", python_docstrings_only=False):
+    if existingIndex is None:
+        existingIndex = {}
     index = existingIndex
+    deletedFiles = handle_deleted_files(index)
+    modifiedFiles = handle_modified_files(index, python_docstrings_only)
+    writeToIndex = len(deletedFiles) > 0 or len(modifiedFiles) > 0
+    
+    for file_path in file_paths:
+        if file_path.endswith("_index.aifs") and file_path.endswith(".DS_Store") and file_path.endswith("_.aifs"):
+            continue
+        # if there are new files not in index, or modified Files, index them
+        if file_path not in index or file_path in modifiedFiles:
+            log(f"{file_path} is new file or modified, indexing it")
+            writeToIndex = True
+            file_index = index_file(file_path, python_docstrings_only)
+            index[file_path] = file_index
+        else:
+            log(f"{file_path} is in index, skip")
+    
+    save_index(writeToIndex, index, indexPath)
+    
+    return index
+
+
+def handle_deleted_files(index: dict) -> List[str]:
+    """updates the index to remove deleted files. returns deleted files"""
     deletedFiles = []
-    modifiedFiles = []
-    writeToIndex = False
-    for file_path, file_index in index.items():
-        # if a file is deleted since last index, add it to deletedFiles
+    for file_path, _ in index.items():
         if not os.path.isfile(file_path):
             log(f"Removing {file_path} since it does not exist.")
             deletedFiles.append(file_path)
-            writeToIndex = True
-            continue
-
-        # if a file is modified since last index, re-index it
-        if os.path.getmtime(file_path) != file_index["last_modified"]:
-            modifiedFiles.append(file_path)
-            log(f"Re-indexing {file_path} due to modification.")
-            new_file_index = index_file(file_path, python_docstrings_only)
-            index[file_path] = new_file_index
-            writeToIndex = True
-    
     # remove deleted files
     for file_path in deletedFiles:
         index.pop(file_path, None)
+
+    return deletedFiles
+
+
+def handle_modified_files(index: dict, python_docstrings_only: bool) -> List[str]:
+    modifiedFiles = []
+    for file_path, file_index in index.items():
+        if os.path.getmtime(file_path) != file_index["last_modified"]:
+            log(f"Re-indexing {file_path} due to modification.")
+            new_file_index = index_file(file_path, python_docstrings_only)
+            index[file_path] = new_file_index
+            modifiedFiles.append(file_path)
+    return modifiedFiles
+
+
+def save_index(writeToIndex, index, indexPath):
+    if writeToIndex:
+        log(f"Index has changed, saving again to {indexPath}")
+        with open(indexPath, "w") as f:
+            json.dump(index, f)
+
+
+def index_directory(path, existingIndex=None, indexPath="", python_docstrings_only=False):
+    if existingIndex is None:
+        existingIndex = {}
+    index = existingIndex
+    deletedFiles = handle_deleted_files(index)
+    modifiedFiles = handle_modified_files(index, python_docstrings_only)
+    writeToIndex = len(deletedFiles) > 0 or len(modifiedFiles) > 0
     
     for root, _, files in os.walk(path):
         for file in files:
@@ -153,46 +204,55 @@ def index_directory(path, existingIndex={}, indexPath="", python_docstrings_only
                 else:
                    log(f"{file_path} is in index, skip")
     
-    # if there are any modifications to index, write it agian
-    if writeToIndex:
-        log(f"Index has changed, saving again to {indexPath}")
-        with open(indexPath, 'w') as f:
-            json.dump(index, f)
+    save_index(writeToIndex, index, indexPath)
     
     return index
 
-def search(query, path=None, max_results=5, verbose=False, python_docstrings_only=False):
+
+def search(query, path=None, file_paths=None, max_results=5, verbose=False, python_docstrings_only=False):
     """
     Performs a semantic search of the `query` in `path` and its subdirectories.
 
     Parameters:
     query (str): The search query.
     path (str, optional): The path to the directory to search. Defaults to the current working directory.
+    file_paths (list, optional): A list of file paths to search. Defaults to None. Used only if path isn't provided.
     max_results (int, optional): The maximum number of search results to return. Defaults to 5.
 
     Returns:
     list: A list of search results.
     """
     os.environ['LOG_VERBOSE'] = str(verbose)
-    if path == None:
-        path = os.getcwd()
 
-    path_to_index = os.path.join(path, "_.aifs")
+    if path is None:
+        common_prefix = os.path.commonprefix(file_paths)
+        path_to_index = os.path.join(common_prefix, "_.aifs")
+    else:
+        path_to_index = os.path.join(path, "_.aifs")
+
     index = {}
     if not os.path.exists(path_to_index):
         # No index. We're embedding everything.
-        log(f"Indexing `{path}` for AI search. This will take time, but only happens once.")
+        log(f"Indexing for AI search. This will take time, but only happens once.")
     else:
-        log(f"Using existing index at `{path}`")
+        log(f"Using existing index at `{path_to_index}`")
         with open(path_to_index, 'r') as f:
             index = json.load(f)
     
-    index = index_directory(path, existingIndex=index, indexPath=path_to_index, python_docstrings_only=python_docstrings_only)
+    if path or file_paths is None:
+        if path is None:
+            path = os.getcwd()
+        index = index_directory(path, existingIndex=index, indexPath=path_to_index, python_docstrings_only=python_docstrings_only)
+    else:
+        index = index_files(file_paths, existingIndex=index, indexPath=path_to_index, python_docstrings_only=python_docstrings_only)
 
     chroma_client = chromadb.Client()
     collection = chroma_client.get_or_create_collection(name="temp")
     id_counter = 0
     for file_path, file_index in index.items():
+        print(f"Indexing {file_path}...")
+        if "__pycache__" in file_path:
+            continue
         ids = [str(id) for id in range(id_counter, id_counter + len(file_index["chunks"]))]
         id_counter += len(file_index["chunks"])
         if ids:
