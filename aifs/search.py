@@ -176,6 +176,8 @@ def handle_deleted_files(index: dict) -> List[str]:
 def handle_modified_files(index: dict, python_docstrings_only: bool) -> List[str]:
     modifiedFiles = []
     for file_path, file_index in index.items():
+        if file_path == None or file_index == None:
+            continue
         if os.path.getmtime(file_path) != file_index["last_modified"]:
             log(f"Re-indexing {file_path} due to modification.")
             new_file_index = index_file(file_path, python_docstrings_only)
