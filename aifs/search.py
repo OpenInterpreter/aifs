@@ -262,8 +262,11 @@ def search(query, path=None, file_paths=None, max_results=5, verbose=False, pyth
     for file_path, file_index in index.items():
         if "__pycache__" in file_path:
             continue
-        ids = [str(id) for id in range(id_counter, id_counter + len(file_index["chunks"]))]
-        id_counter += len(file_index["chunks"])
+        if file_index and "chunks" in file_index:
+            ids = [str(id) for id in range(id_counter, id_counter + len(file_index["chunks"]))]
+            id_counter += len(file_index["chunks"])
+        else:
+            ids = []
         if ids:
             collection.add(
                 ids=ids,
