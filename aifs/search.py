@@ -101,8 +101,12 @@ def minimally_index_python_file(path):
     chunks = []
     representations = []
     
-    with open(path, "r") as source:
-        tree = ast.parse(source.read())
+    try:
+        with open(path, "r") as source:
+            tree = ast.parse(source.read())
+    except Exception as e:
+        print(f"Couldn't parse {path}. Error:", str(e))
+        return None
 
     def traverse(node):
         for child in ast.iter_child_nodes(node):
@@ -145,7 +149,8 @@ def index_files(file_paths, existingIndex=None, indexPath="", python_docstrings_
             log(f"{file_path} is new file or modified, indexing it")
             writeToIndex = True
             file_index = index_file(file_path, python_docstrings_only)
-            index[file_path] = file_index
+            if file_index:
+                index[file_path] = file_index
         else:
             log(f"{file_path} is in index, skip")
     
