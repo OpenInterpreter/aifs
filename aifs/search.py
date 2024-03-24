@@ -62,29 +62,29 @@ def log(str):
     verbose = os.environ['LOG_VERBOSE']
     if verbose and verbose == 'True': print(str)
 
-def chunk_file(path):
-    elements = partition(filename=path)
+def chunk_file(file_path):
+    elements = partition(filename=file_path)
     chunks = chunk_by_title(elements, max_characters=MAX_CHARS_PER_CHUNK)
     return [c.text for c in chunks]
 
-def index_file(path, python_docstrings_only=False):
-    if python_docstrings_only and path.lower().endswith(".py"):
-        return minimally_index_python_file(path)
+def index_file(file_path, python_docstrings_only=False):
+    if python_docstrings_only and file_path.lower().endswith(".py"):
+        return minimally_index_python_file(file_path)
 
-    log(f"Indexing {path}...")
+    log(f"Indexing {file_path}...")
     try:
-      chunks = chunk_file(path)
+      chunks = chunk_file(file_path)
       if chunks == []:
         raise Exception("Failed to chunk.")
       if MAX_CHUNKS and len(chunks) > MAX_CHUNKS:
         raise Exception("Too many chunks. Will just embed filename.")
     except Exception as e:
-      log(f"Couldn't read `{path}`. Continuing.")
+      log(f"Couldn't read `{file_path}`. Continuing.")
       log(e)
-      chunks = [f"There is a file at `{path}`."]
+      chunks = [f"There is a file at `{file_path}`."]
 
     embeddings = embed(chunks)
-    last_modified = os.path.getmtime(path)
+    last_modified = os.path.getmtime(file_path)
 
     return {
         "chunks": chunks,
@@ -93,7 +93,7 @@ def index_file(path, python_docstrings_only=False):
     }
 
 
-def minimally_index_python_file(path):
+def minimally_index_python_file(file_path):
     """
     This function indexes a Python file in a minimal way.
     It only embeds the docstrings for semantic search, which then point to only the function name.
@@ -102,10 +102,10 @@ def minimally_index_python_file(path):
     representations = []
     
     try:
-        with open(path, "r") as source:
+        with open(file_path, "r") as source:
             tree = ast.parse(source.read())
     except Exception as e:
-        print(f"Couldn't parse {path}. Error:", str(e))
+        print(f"Couldn't parse {file_path}. Error:", str(e))
         return None
 
     def traverse(node):
@@ -124,7 +124,7 @@ def minimally_index_python_file(path):
     traverse(tree)
 
     embeddings = embed(representations) if representations else []
-    last_modified = os.path.getmtime(path)
+    last_modified = os.path.getmtime(file_path)
 
     return {
         "chunks": chunks,
