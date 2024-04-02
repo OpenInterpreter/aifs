@@ -1,16 +1,14 @@
 [tool.poetry]
 name = "aifs"
-version = "0.0.11"
+version = "0.0.12"
 description = "Local semantic search. Stupidly simple."
 authors = ["Killian Lucas <killian@openinterpreter.com>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12"
-unstructured = "^0.12.0"
+python = ">=3.8,<4"
 chromadb = "^0.4.22"
-
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"

@@ -2,6 +2,17 @@
 Simple, fast, local semantic search. Uses an _.aifs file to store embeddings in top most directory.
 """
 
+import sys
+
+try:
+    from unstructured.chunking.title import chunk_by_title
+    from unstructured.partition.auto import partition
+except ImportError:
+    if sys.version_info.major == 3 and sys.version_info.minor == 12:
+        raise ImportError("The 'unstructured' package required by this project does not support Python 3.12. "
+                          "Please downgrade to Python 3.11 to continue.")
+    raise ImportError("Please run 'pip install \"unstructured[all-docs]\"' to continue.")
+
 # TODO
 # Should use system search, like spotlight, to narrow it down. Then rerank with semantic.
 # Should use sub indexes in nested dirs if they exist.
@@ -11,8 +22,6 @@ import ast
 import os
 from typing import List
 import chromadb
-from unstructured.chunking.title import chunk_by_title
-from unstructured.partition.auto import partition
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
 import json
 
