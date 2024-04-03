@@ -4,14 +4,30 @@ Simple, fast, local semantic search. Uses an _.aifs file to store embeddings in 
 
 import sys
 
+MAX_CHARS_PER_CHUNK = 500
+MAX_CHUNKS = None # More than this, and we'll just embed the filename. None to embed any # of chunks.
+
 try:
     from unstructured.chunking.title import chunk_by_title
     from unstructured.partition.auto import partition
+
+    def chunk_file(file_path):
+        elements = partition(filename=file_path)
+        chunks = chunk_by_title(elements, max_characters=MAX_CHARS_PER_CHUNK)
+        return [c.text for c in chunks]
+
 except ImportError:
-    if sys.version_info.major == 3 and sys.version_info.minor == 12:
-        raise ImportError("The 'unstructured' package required by this project does not support Python 3.12. "
-                          "Please downgrade to Python 3.11 to continue.")
-    raise ImportError("Please run 'pip install \"unstructured[all-docs]\"' to continue.")
+    print("Please run 'pip install \"unstructured[all-docs]\"' to improve document-reading performance.")
+
+    def chunk_file(file_path):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            file_text = file.read()
+        
+        # Chunk the text
+        chunks = [file_text[i:i+MAX_CHARS_PER_CHUNK] for i in range(0, len(file_text), MAX_CHARS_PER_CHUNK)]
+        return chunks
+
+
 
 # TODO
 # Should use system search, like spotlight, to narrow it down. Then rerank with semantic.
@@ -24,9 +40,6 @@ from typing import List
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
 import json
-
-MAX_CHARS_PER_CHUNK = 500
-MAX_CHUNKS = None # More than this, and we'll just embed the filename. None to embed any # of chunks.
 
 # Set up the embedding function
 os.environ[
@@ -70,11 +83,6 @@ def format_function_details(func_def, class_name=None):
 def log(str):
     verbose = os.environ['LOG_VERBOSE']
     if verbose and verbose == 'True': print(str)
-
-def chunk_file(file_path):
-    elements = partition(filename=file_path)
-    chunks = chunk_by_title(elements, max_characters=MAX_CHARS_PER_CHUNK)
-    return [c.text for c in chunks]
 
 def index_file(file_path, python_docstrings_only=False):
     if python_docstrings_only and file_path.lower().endswith(".py"):
