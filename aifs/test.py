@@ -8,4 +8,4 @@ def test_search_index():
     print(results)
     assert results
 
-test_search_index();
+test_search_index()
