@@ -28,7 +28,6 @@ except ImportError:
         return chunks
 
 
-
 # TODO
 # Should use system search, like spotlight, to narrow it down. Then rerank with semantic.
 # Should use sub indexes in nested dirs if they exist.
@@ -37,16 +36,20 @@ except ImportError:
 import ast
 import os
 from typing import List
-import chromadb
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
 import json
 
-# Set up the embedding function
-os.environ[
-    "TOKENIZERS_PARALLELISM"
-] = "false"  # Otherwise setup_embed displays a warning message
+try:
+    import chromadb
+    from chromadb.utils.embedding_functions import DefaultEmbeddingFunction as setup_embed
+    # Set up the embedding function
+    os.environ[
+        "TOKENIZERS_PARALLELISM"
+    ] = "false"  # Otherwise setup_embed displays a warning message
 
-embed = setup_embed()
+    embed = setup_embed()
+except:
+    pass # shoulda used vlite
+
 
 # Function to extract function arguments and annotations
 def format_function_details(func_def, class_name=None):
