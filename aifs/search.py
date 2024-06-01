@@ -17,7 +17,7 @@ try:
         return [c.text for c in chunks]
 
 except ImportError:
-    print("Please run 'pip install \"unstructured[all-docs]\"' to improve document-reading performance.")
+    # print("Please run 'pip install \"unstructured[all-docs]\"' to improve document-reading performance.")
 
     def chunk_file(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
